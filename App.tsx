@@ -151,13 +151,13 @@ const App: React.FC = () => {
         finalPhases = await gateway.getAuditPhases();
       }
 
-      // Ensure 3 KPI tiers exist (Small / Medium / Large)
+      // Ensure 3 KPI tiers exist (Small / Medium / Large) using percentage thresholds
       let finalKpiTiers = kpiData;
       const requiredTierNames = ['Small', 'Medium', 'Large'];
       const defaultTierRanges = [
-        { min: 0,   max: 100    },
-        { min: 101, max: 500    },
-        { min: 501, max: 1000000 }
+        { min: 0,   max: 29  },
+        { min: 30,  max: 69  },
+        { min: 70,  max: 100 }
       ];
       // Rename legacy 'Tier 1/2/3' entries on first load after upgrade
       const legacyNameMap: Record<string, string> = { 'Tier 1': 'Small', 'Tier 2': 'Medium', 'Tier 3': 'Large' };
@@ -180,7 +180,15 @@ const App: React.FC = () => {
         }
         finalKpiTiers = await gateway.getKPITiers();
       } else {
-        // Reload after potential rename
+        // Migration: If any tier has minAssets > 100, they are using raw asset counts instead of percentages.
+        const needsMigration = kpiData.some(t => t.minAssets > 100 || t.maxAssets > 100);
+        if (needsMigration) {
+          const sorted = [...kpiData].sort((a,b) => a.minAssets - b.minAssets);
+          if (sorted[0]) await gateway.updateKPITier(sorted[0].id, { minAssets: 0, maxAssets: 29 });
+          if (sorted[1]) await gateway.updateKPITier(sorted[1].id, { minAssets: 30, maxAssets: 69 });
+          if (sorted[2]) await gateway.updateKPITier(sorted[2].id, { minAssets: 70, maxAssets: 100 });
+        }
+        
         finalKpiTiers = await gateway.getKPITiers();
       }
 
@@ -544,20 +552,34 @@ const App: React.FC = () => {
     if (!dept) return auditPhases[0]?.id || '';
 
     const assets = dept.totalAssets || 0;
+    
+    // Find the highest department asset
+    let maxAssets = 0;
+    for (const d of departmentsWithAssets) {
+        if ((d.totalAssets || 0) > maxAssets) maxAssets = d.totalAssets || 0;
+    }
+    
+    // Calculate this department's percentage
+    const deptPercentage = maxAssets > 0 ? (assets / maxAssets) * 100 : 0;
 
+    // Find the tier that matches this percentage
+    const tier = kpiTiers
+      .filter(t => deptPercentage >= t.minAssets)
+      .sort((a, b) => b.minAssets - a.minAssets)[0];
 
-      // Find the highest minAssets tier that is <= assets
-      const tier = kpiTiers
-        .filter(t => assets >= t.minAssets)
-        .sort((a, b) => b.minAssets - a.minAssets)[0];
-      if (tier) {
-        // Return the first phase that has a target > 0
-        const sortedPhases = [...auditPhases].sort((a, b) => a.startDate.localeCompare(b.startDate));
-        const firstPhaseId = sortedPhases.find(p => (tier.targets[p.id] || 0) > 0)?.id;
-        if (firstPhaseId) return firstPhaseId;
-      }
+    if (tier) {
+      // Return the first phase that has a target > 0
+      const sortedPhases = [...auditPhases].sort((a, b) => a.startDate.localeCompare(b.startDate));
+      const firstPhaseId = sortedPhases.find(p => {
+         const target = kpiTierTargets.find(kt => kt.tierId === tier.id && kt.phaseId === p.id)?.targetPercentage 
+                        || tier.targets?.[p.id] 
+                        || 0;
+         return target > 0;
+      })?.id;
+      if (firstPhaseId) return firstPhaseId;
+    }
     return auditPhases[0]?.id || '';
-  }, [departmentsWithAssets, auditPhases, kpiTiers]);
+  }, [departmentsWithAssets, auditPhases, kpiTiers, kpiTierTargets]);
 
   const isAuditLocked = (audit: AuditSchedule) => {
     return !!(audit.date && (audit.auditor1Id || audit.auditor2Id));

@@ -50,6 +50,28 @@ export const KPISettings: React.FC<KPISettingsProps> = ({
     return map;
   }, [tierTargets]);
 
+  const highestDeptAssets = useMemo(() => {
+    let max = 0;
+    for (const d of departments) {
+      if ((d.totalAssets || 0) > max) max = d.totalAssets || 0;
+    }
+    return max;
+  }, [departments]);
+
+  if (highestDeptAssets === 0) {
+    return (
+      <div className="bg-white rounded-[32px] border border-slate-200 shadow-sm overflow-hidden p-12 mt-8 text-center animate-in fade-in">
+        <div className="w-16 h-16 bg-slate-100 text-slate-400 rounded-2xl flex items-center justify-center mx-auto mb-6">
+          <Lock className="w-8 h-8" />
+        </div>
+        <h3 className="text-xl font-bold text-slate-900 mb-2">KPI Configuration Locked</h3>
+        <p className="text-slate-500 max-w-md mx-auto leading-relaxed">
+          You must upload Departments and Locations first. The system requires real asset data to calculate the benchmark department and automatically generate dynamic percentage tiers.
+        </p>
+      </div>
+    );
+  }
+
   const startEdit = (tier: KPITier) => {
     setEditingId(tier.id);
     const currentTargets = targetsByTier.get(tier.id) || tier.targets || {};
@@ -110,7 +132,7 @@ export const KPISettings: React.FC<KPISettingsProps> = ({
           <thead className="bg-slate-50/50 border-b border-slate-100">
             <tr>
               <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400 tracking-widest w-48">Asset Tier</th>
-              <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400 tracking-widest w-48">Range (Assets)</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400 tracking-widest w-64">Size Threshold (%)</th>
               {sortedPhases.map(phase => (
                 <th key={phase.id} className="px-4 py-4 text-[10px] font-black uppercase text-slate-400 tracking-widest text-center">
                   {phase.name} <br/>
@@ -121,7 +143,7 @@ export const KPISettings: React.FC<KPISettingsProps> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
-            {sortedTiers.map(tier => {
+            {sortedTiers.map((tier, idx) => {
               const isEditing = editingId === tier.id;
               
               return (
@@ -142,18 +164,29 @@ export const KPISettings: React.FC<KPISettingsProps> = ({
                   {/* Range */}
                   <td className="px-6 py-4">
                     {isEditing ? (
-                      <input 
-                        type="number"
-                        min={0}
-                        className="w-16 px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500/20"
-                        value={formData.minAssets}
-                        onChange={e => setFormData({...formData, minAssets: parseInt(e.target.value) || 0})}
-                      />
+                      <div className="flex items-center gap-1">
+                        <input 
+                          type="number"
+                          min={0}
+                          max={100}
+                          disabled={tier.id === sortedTiers[0].id}
+                          className="w-16 px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500/20 disabled:bg-slate-100 disabled:text-slate-400"
+                          value={formData.minAssets}
+                          onChange={e => setFormData({...formData, minAssets: parseInt(e.target.value) || 0})}
+                        />
+                        <span className="text-xs text-slate-400 font-bold">%</span>
+                      </div>
                     ) : (
-                      <span className="text-xs text-slate-500 font-mono">
-                        {tier.minAssets}{' '}
-                        {sortedTiers[sortedTiers.length - 1].id === tier.id ? 'and above (∞)' : ''}
-                      </span>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-bold text-slate-700">
+                          {tier.minAssets}% 
+                          {idx === sortedTiers.length - 1 ? ' and above' : ` to ${(sortedTiers[idx+1]?.minAssets || 100) - 1}%`}
+                        </span>
+                        <span className="text-[10px] text-slate-400 mt-0.5">
+                           ({Math.round(highestDeptAssets * (tier.minAssets / 100))} 
+                           {idx === sortedTiers.length - 1 ? ' assets +' : ` to ${Math.round(highestDeptAssets * (((sortedTiers[idx+1]?.minAssets || 100)) / 100)) - 1} assets`})
+                        </span>
+                      </div>
                     )}
                   </td>
 
