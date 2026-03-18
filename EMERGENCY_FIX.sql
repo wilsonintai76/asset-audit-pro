@@ -34,10 +34,10 @@ RETURNS TABLE (
 BEGIN
     RETURN QUERY
     SELECT 
-        id,
-        name,
-        min_assets,
-        max_assets,
+        kpi_tiers.id,
+        kpi_tiers.name,
+        kpi_tiers.min_assets,
+        kpi_tiers.max_assets,
         '{}'::json as targets
     FROM kpi_tiers;
 END;
