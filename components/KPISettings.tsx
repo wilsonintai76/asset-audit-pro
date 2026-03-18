@@ -25,10 +25,9 @@ export const KPISettings: React.FC<KPISettingsProps> = ({
 }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [tierToDelete, setTierToDelete] = useState<string | null>(null);
-  const [formData, setFormData] = useState<{ name: string; minAssets: number; maxAssets: number; targets: Record<string, number> }>({
+  const [formData, setFormData] = useState<{ name: string; minAssets: number; targets: Record<string, number> }>({
     name: '',
     minAssets: 0,
-    maxAssets: 0,
     targets: {}
   });
 
@@ -55,14 +54,13 @@ export const KPISettings: React.FC<KPISettingsProps> = ({
     setFormData({
       name: tier.name || '',
       minAssets: tier.minAssets || 0,
-      maxAssets: tier.maxAssets || 0,
       targets: { ...currentTargets }
     });
   };
 
   const resetForm = () => {
     setEditingId(null);
-    setFormData({ name: '', minAssets: 0, maxAssets: 0, targets: {} });
+    setFormData({ name: '', minAssets: 0, targets: {} });
   };
 
   const handleTargetChange = (phaseId: string, raw: string) => {
@@ -72,7 +70,7 @@ export const KPISettings: React.FC<KPISettingsProps> = ({
 
   const saveEdit = async () => {
     if (!editingId) return;
-    onUpdateTier(editingId, { minAssets: formData.minAssets, maxAssets: formData.maxAssets });
+    onUpdateTier(editingId, { minAssets: formData.minAssets });
     for (const phase of sortedPhases) {
       const pct = formData.targets[phase.id] ?? 0;
       onUpdateTarget(editingId, phase.id, pct);
@@ -142,26 +140,17 @@ export const KPISettings: React.FC<KPISettingsProps> = ({
                   {/* Range */}
                   <td className="px-6 py-4">
                     {isEditing ? (
-                      <div className="flex items-center gap-2">
-                       <input 
-                         type="number"
-                         min={0}
-                         className="w-16 px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500/20"
-                         value={formData.minAssets}
-                         onChange={e => setFormData({...formData, minAssets: parseInt(e.target.value)})}
-                       />
-                       <span className="text-slate-400">-</span>
-                       <input 
-                         type="number"
-                         min={formData.minAssets + 1}
-                         className="w-20 px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500/20"
-                         value={formData.maxAssets}
-                         onChange={e => setFormData({...formData, maxAssets: parseInt(e.target.value)})}
-                       />
-                      </div>
+                      <input 
+                        type="number"
+                        min={0}
+                        className="w-16 px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500/20"
+                        value={formData.minAssets}
+                        onChange={e => setFormData({...formData, minAssets: parseInt(e.target.value)})}
+                      />
                     ) : (
                       <span className="text-xs text-slate-500 font-mono">
-                       {tier.minAssets} - {tier.maxAssets > 1000000 ? '∞' : tier.maxAssets}
+                        {tier.minAssets}{' '}
+                        {sortedTiers[sortedTiers.length - 1].id === tier.id ? 'and above (∞)' : ''}
                       </span>
                     )}
                   </td>

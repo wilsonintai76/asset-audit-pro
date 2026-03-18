@@ -545,17 +545,17 @@ const App: React.FC = () => {
 
     const assets = dept.totalAssets || 0;
 
-    // Use KPI Tiers if available
-    if (kpiTiers.length > 0) {
-      const tier = kpiTiers.find(t => assets >= t.minAssets && assets <= t.maxAssets);
+
+      // Find the highest minAssets tier that is <= assets
+      const tier = kpiTiers
+        .filter(t => assets >= t.minAssets)
+        .sort((a, b) => b.minAssets - a.minAssets)[0];
       if (tier) {
         // Return the first phase that has a target > 0
         const sortedPhases = [...auditPhases].sort((a, b) => a.startDate.localeCompare(b.startDate));
         const firstPhaseId = sortedPhases.find(p => (tier.targets[p.id] || 0) > 0)?.id;
         if (firstPhaseId) return firstPhaseId;
       }
-    }
-
     return auditPhases[0]?.id || '';
   }, [departmentsWithAssets, auditPhases, kpiTiers]);
 
@@ -789,8 +789,10 @@ const App: React.FC = () => {
       if (schedule && isAuditLocked(schedule) && (updates.phaseId || updates.departmentId || updates.locationId)) {
         throw new Error("Locked audits cannot have their phase, department, or location changed.");
       }
-      await gateway.updateAudit(id, updates);
-      setSchedules(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
+        // Only update the selected tier's minAssets
+        await gateway.updateKPITier(id, updates);
+        setKpiTiers(await gateway.getKPITiers());
+        showToast('KPI Tier updated');
     } catch (e) {
       showError(e, 'Audit Update Failed');
     }

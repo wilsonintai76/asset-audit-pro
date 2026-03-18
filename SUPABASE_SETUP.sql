@@ -203,9 +203,7 @@ CREATE TABLE cross_audits (
 CREATE TABLE kpi_tiers (
   id         UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
   name       TEXT    NOT NULL,
-  min_assets INTEGER NOT NULL CONSTRAINT chk_min_assets CHECK (min_assets >= 0),
-  max_assets INTEGER NOT NULL,
-  CONSTRAINT chk_asset_range CHECK (max_assets >= min_assets)
+  min_assets INTEGER NOT NULL CONSTRAINT chk_min_assets CHECK (min_assets >= 0)
 );
 
 -- =============================================================

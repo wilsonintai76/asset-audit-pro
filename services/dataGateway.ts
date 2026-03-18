@@ -658,7 +658,6 @@ class DataGateway {
       return (data || []).map((t: any) => ({
         ...t,
         minAssets: t.min_assets,
-        maxAssets: t.max_assets,
         targets: (t.kpi_tier_targets || []).reduce((acc: Record<string, number>, row: any) => {
           if (row?.phase_id) acc[row.phase_id] = row.target_percentage ?? 0;
           return acc;
@@ -672,7 +671,6 @@ class DataGateway {
     if (supabase) {
       const payload: any = { ...tier };
       if (tier.minAssets !== undefined) { payload.min_assets = tier.minAssets; delete payload.minAssets; }
-      if (tier.maxAssets !== undefined) { payload.max_assets = tier.maxAssets; delete payload.maxAssets; }
 
       const { error } = await supabase.from('kpi_tiers').insert([payload]);
       if (error) throw error;
@@ -685,7 +683,6 @@ class DataGateway {
     if (supabase) {
       const payload: any = { ...updates };
       if (updates.minAssets !== undefined) { payload.min_assets = updates.minAssets; delete payload.minAssets; }
-      if (updates.maxAssets !== undefined) { payload.max_assets = updates.maxAssets; delete payload.maxAssets; }
 
       const { error } = await supabase.from('kpi_tiers').update(payload).eq('id', id);
       if (error) throw error;
