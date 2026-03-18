@@ -630,7 +630,28 @@ class DataGateway {
   async getKPITiers(): Promise<KPITier[]> {
     if (supabase) {
       try {
-        console.log('[DEBUG] Starting getKPITiers - using separate queries approach');
+        console.log('[DEBUG] Starting getKPITiers - trying fallback view first');
+        
+        // Try the fallback view first (bypasses all relationship issues)
+        try {
+          const { data: viewData, error: viewError } = await supabase
+            .from('kpi_tiers_with_targets')
+            .select('*');
+          
+          if (!viewError && viewData) {
+            console.log('[DEBUG] Successfully used fallback view:', viewData.length);
+            return viewData.map((tier: any) => ({
+              ...tier,
+              minAssets: tier.min_assets,
+              maxAssets: tier.max_assets,
+              targets: tier.targets || {}
+            }));
+          }
+        } catch (viewErr) {
+          console.warn('[WARN] Fallback view not available, trying separate queries:', viewErr);
+        }
+        
+        console.log('[DEBUG] Fallback to separate queries approach');
         
         // Get basic tier data first - NO RELATIONSHIPS
         const { data: tiersData, error: tiersError } = await supabase
