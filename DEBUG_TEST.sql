@@ -16,12 +16,18 @@ SELECT *, kpi_tier_targets(phase_id, target_percentage)
 FROM kpi_tiers 
 LIMIT 1;
 
--- Step 4: Show table structures
+-- Step 4: Show table structures using proper SQL
 SELECT 'kpi_tiers structure:' as info;
-\d kpi_tiers
+SELECT column_name, data_type, is_nullable, column_default 
+FROM information_schema.columns 
+WHERE table_name = 'kpi_tiers' 
+ORDER BY ordinal_position;
 
 SELECT 'kpi_tier_targets structure:' as info;
-\d kpi_tier_targets
+SELECT column_name, data_type, is_nullable, column_default 
+FROM information_schema.columns 
+WHERE table_name = 'kpi_tier_targets' 
+ORDER BY ordinal_position;
 
 -- Step 5: Force schema cache reload
 SELECT 'Reloading schema cache...' as status;
