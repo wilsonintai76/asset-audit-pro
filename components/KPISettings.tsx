@@ -51,15 +51,10 @@ export const KPISettings: React.FC<KPISettingsProps> = ({
 
   const startEdit = (tier: KPITier) => {
     setEditingId(tier.id);
-    
-    // Calculate effective minAssets from the preceding tier in the sorted list
-    const tierIndex = sortedTiers.findIndex(t => t.id === tier.id);
-    const calculatedMin = tierIndex > 0 ? sortedTiers[tierIndex - 1].maxAssets + 1 : 0;
-
     const currentTargets = targetsByTier.get(tier.id) || tier.targets || {};
     setFormData({
       name: tier.name || '',
-      minAssets: calculatedMin, // Force continuity
+      minAssets: tier.minAssets || 0,
       maxAssets: tier.maxAssets || 0,
       targets: { ...currentTargets }
     });
@@ -77,7 +72,7 @@ export const KPISettings: React.FC<KPISettingsProps> = ({
 
   const saveEdit = async () => {
     if (!editingId) return;
-    onUpdateTier(editingId, { maxAssets: formData.maxAssets });
+    onUpdateTier(editingId, { minAssets: formData.minAssets, maxAssets: formData.maxAssets });
     for (const phase of sortedPhases) {
       const pct = formData.targets[phase.id] ?? 0;
       onUpdateTarget(editingId, phase.id, pct);
@@ -147,26 +142,27 @@ export const KPISettings: React.FC<KPISettingsProps> = ({
                   {/* Range */}
                   <td className="px-6 py-4">
                     {isEditing ? (
-                       <div className="flex items-center gap-2">
-                         <input 
-                            readOnly
-                            type="number"
-                            className="w-16 px-2 py-1.5 bg-slate-100 border border-slate-200 rounded-lg text-xs text-slate-400 cursor-not-allowed"
-                            value={formData.minAssets}
-                         />
-                         <span className="text-slate-400">-</span>
-                         <input 
-                            type="number"
-                            min={formData.minAssets + 1}
-                            className="w-20 px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500/20"
-                            value={formData.maxAssets}
-                            onChange={e => setFormData({...formData, maxAssets: parseInt(e.target.value)})}
-                         />
-                       </div>
+                      <div className="flex items-center gap-2">
+                       <input 
+                         type="number"
+                         min={0}
+                         className="w-16 px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500/20"
+                         value={formData.minAssets}
+                         onChange={e => setFormData({...formData, minAssets: parseInt(e.target.value)})}
+                       />
+                       <span className="text-slate-400">-</span>
+                       <input 
+                         type="number"
+                         min={formData.minAssets + 1}
+                         className="w-20 px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500/20"
+                         value={formData.maxAssets}
+                         onChange={e => setFormData({...formData, maxAssets: parseInt(e.target.value)})}
+                       />
+                      </div>
                     ) : (
-                       <span className="text-xs text-slate-500 font-mono">
-                         {tier.minAssets} - {tier.maxAssets > 1000000 ? '∞' : tier.maxAssets}
-                       </span>
+                      <span className="text-xs text-slate-500 font-mono">
+                       {tier.minAssets} - {tier.maxAssets > 1000000 ? '∞' : tier.maxAssets}
+                      </span>
                     )}
                   </td>
 
