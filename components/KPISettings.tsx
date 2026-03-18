@@ -78,9 +78,12 @@ export const KPISettings: React.FC<KPISettingsProps> = ({
   const saveEdit = async () => {
     if (!editingId) return;
     try {
-      await onUpdateTier(editingId, { maxAssets: formData.maxAssets });
+      // Validate maxAssets before sending
+      const validMaxAssets = isNaN(formData.maxAssets) || formData.maxAssets === null ? 0 : Math.max(0, formData.maxAssets);
+      
+      await onUpdateTier(editingId, { maxAssets: validMaxAssets });
       for (const phase of sortedPhases) {
-        const pct = formData.targets[phase.id] ?? 0;
+        const pct = isNaN(formData.targets[phase.id]) ? 0 : Math.max(0, Math.min(100, formData.targets[phase.id] ?? 0));
         await onUpdateTarget(editingId, phase.id, pct);
       }
       resetForm();
@@ -164,8 +167,12 @@ export const KPISettings: React.FC<KPISettingsProps> = ({
                             type="number"
                             min={formData.minAssets + 1}
                             className="w-20 px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500/20"
-                            value={formData.maxAssets}
-                            onChange={e => setFormData({...formData, maxAssets: parseInt(e.target.value)})}
+                            value={formData.maxAssets || ''}
+                            onChange={e => {
+                              const value = e.target.value;
+                              const parsedValue = value === '' ? 0 : parseInt(value, 10);
+                              setFormData({...formData, maxAssets: isNaN(parsedValue) ? formData.maxAssets : parsedValue});
+                            }}
                          />
                        </div>
                     ) : (
