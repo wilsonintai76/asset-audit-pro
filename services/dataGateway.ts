@@ -629,38 +629,52 @@ class DataGateway {
   // --- KPI TIERS ---
   async getKPITiers(): Promise<KPITier[]> {
     if (supabase) {
-      // Get basic tier data first
-      const { data: tiersData, error: tiersError } = await supabase
-        .from('kpi_tiers')
-        .select('*');
-      
-      if (tiersError) throw tiersError;
-      
-      // Get targets separately and combine manually
-      let targetsData: any[] = [];
       try {
-        const { data: targets } = await supabase
-          .from('kpi_tier_targets')
+        // Get basic tier data first
+        const { data: tiersData, error: tiersError } = await supabase
+          .from('kpi_tiers')
           .select('*');
-        targetsData = targets || [];
-      } catch (targetErr) {
-        console.warn("KPI targets failed to load (non-fatal):", targetErr);
-        // Continue without targets
-      }
+        
+        if (tiersError) {
+          console.error('Error fetching KPI tiers:', tiersError);
+          throw tiersError;
+        }
+        
+        // Get targets separately and combine manually
+        let targetsData: any[] = [];
+        try {
+          const { data: targets, error: targetsError } = await supabase
+            .from('kpi_tier_targets')
+            .select('*');
+          
+          if (targetsError) {
+            console.warn('KPI targets table not available or error:', targetsError);
+            // Continue without targets - this is expected during initial setup
+          } else {
+            targetsData = targets || [];
+          }
+        } catch (targetErr) {
+          console.warn("KPI targets failed to load (non-fatal):", targetErr);
+          // Continue without targets
+        }
 
-      // Combine tiers with their targets manually
-      return (tiersData || []).map((tier: any) => {
-        const tierTargets = targetsData.filter(t => t.tier_id === tier.id);
-        return {
-          ...tier,
-          minAssets: tier.min_assets,
-          maxAssets: tier.max_assets,
-          targets: tierTargets.reduce((acc: Record<string, number>, row: any) => {
-            if (row?.phase_id) acc[row.phase_id] = row.target_percentage ?? 0;
-            return acc;
-          }, {})
-        };
-      });
+        // Combine tiers with their targets manually
+        return (tiersData || []).map((tier: any) => {
+          const tierTargets = targetsData.filter(t => t.tier_id === tier.id);
+          return {
+            ...tier,
+            minAssets: tier.min_assets,
+            maxAssets: tier.max_assets,
+            targets: tierTargets.reduce((acc: Record<string, number>, row: any) => {
+              if (row?.phase_id) acc[row.phase_id] = row.target_percentage ?? 0;
+              return acc;
+            }, {})
+          };
+        });
+      } catch (error) {
+        console.error('Critical error in getKPITiers:', error);
+        throw error;
+      }
     }
     throw new Error("Supabase client not initialized");
   }
