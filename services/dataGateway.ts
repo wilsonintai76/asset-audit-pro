@@ -629,84 +629,43 @@ class DataGateway {
   // --- KPI TIERS ---
   async getKPITiers(): Promise<KPITier[]> {
     if (supabase) {
-      try {
-        console.log('[DEBUG] Starting getKPITiers - emergency approach');
-        
-        // EMERGENCY: Try the simplest possible approach first
-        try {
-          const { data: simpleData, error: simpleError } = await supabase
-            .from('kpi_tiers_simple')
-            .select('*');
-          
-          if (!simpleError && simpleData) {
-            console.log('[DEBUG] Successfully used simple view:', simpleData.length);
-            // Get targets separately and combine
-            try {
-              const { data: targets, error: targetsError } = await supabase
-                .from('kpi_tier_targets')
-                .select('*');
-              
-              if (!targetsError && targets) {
-                return simpleData.map((tier: any) => {
-                  const tierTargets = targets.filter(t => t.tier_id === tier.id);
-                  return {
-                    ...tier,
-                    minAssets: tier.min_assets,
-                    maxAssets: tier.max_assets,
-                    targets: tierTargets.reduce((acc: Record<string, number>, row: any) => {
-                      if (row?.phase_id) acc[row.phase_id] = row.target_percentage ?? 0;
-                      return acc;
-                    }, {})
-                  };
-                });
-              }
-            } catch (targetErr) {
-              console.warn('[WARN] Could not fetch targets, returning tiers only:', targetErr);
-            }
-            
-            // Return tiers without targets if targets fail
-            return simpleData.map((tier: any) => ({
-              ...tier,
-              minAssets: tier.min_assets,
-              maxAssets: tier.max_assets,
-              targets: {}
-            }));
-          }
-        } catch (simpleErr) {
-          console.warn('[WARN] Simple view not available:', simpleErr);
+      // Prefer joined targets when the relationship exists (new schema).
+      // Fallback to plain select when the join/table doesn't exist yet in the deployed DB.
+      let data: any[] | null = null;
+      let error: any = null;
+      const joined = await supabase
+        .from('kpi_tiers')
+        .select('*, kpi_tier_targets(phase_id, target_percentage)');
+      data = joined.data as any;
+      error = joined.error as any;
+
+      if (error) {
+        const msg = String(error?.message || error);
+        const hint = String(error?.hint || '');
+        const details = String(error?.details || '');
+        const combined = `${msg} ${hint} ${details}`.toLowerCase();
+
+        // Common cases during rollout: missing table, missing relationship, legacy schema
+        if (combined.includes('kpi_tier_targets') || combined.includes('does not exist') || combined.includes('relationship')) {
+          const fallback = await supabase.from('kpi_tiers').select('*');
+          if (fallback.error) throw fallback.error;
+          data = fallback.data as any;
+        } else {
+          throw error;
         }
-        
-        // ULTIMATE FALLBACK: Get only basic tiers, no targets at all
-        console.log('[DEBUG] Ultimate fallback - basic tiers only');
-        const { data: basicData, error: basicError } = await supabase
-          .from('kpi_tiers')
-          .select('id, name, min_assets, max_assets');
-        
-        if (basicError) {
-          console.error('[ERROR] Even basic query failed:', basicError);
-          throw basicError;
-        }
-        
-        console.log('[DEBUG] Successfully fetched basic tiers:', basicData?.length || 0);
-        return (basicData || []).map((tier: any) => ({
-          ...tier,
-          minAssets: tier.min_assets,
-          maxAssets: tier.max_assets,
-          targets: {}  // Empty targets object
-        }));
-        
-      } catch (error) {
-        console.error('[CRITICAL] All approaches failed in getKPITiers:', error);
-        console.error('[CRITICAL] Error details:', {
-          message: error?.message,
-          hint: error?.hint,
-          details: error?.details,
-          code: error?.code
-        });
-        throw error;
       }
+
+      return (data || []).map((t: any) => ({
+        ...t,
+        minAssets: t.min_assets,
+        maxAssets: t.max_assets,
+        targets: (t.kpi_tier_targets || []).reduce((acc: Record<string, number>, row: any) => {
+          if (row?.phase_id) acc[row.phase_id] = row.target_percentage ?? 0;
+          return acc;
+        }, {})
+      })) as KPITier[];
     }
-    throw new Error("Supabase client not initialized");
+    return [];
   }
 
   async addKPITier(tier: Omit<KPITier, 'id'>) {
